@@ -9,7 +9,7 @@ st.set_page_config(page_title="Spare Parts Customer Portal", page_icon="⚙️",
 DATA_DIR = "data"
 DEFAULT_INVENTORY = os.path.join(DATA_DIR, "inventory.xlsx")
 RFQ_FILE = os.path.join(DATA_DIR, "customer_rfqs.xlsx")
-ADMIN_PASSWORD = "1234"  # غيّرها من هنا قبل النشر
+ADMIN_PASSWORD = "Manutd@033"  # Change this before deployment
 
 SAFE_COLUMNS = ["Part Number", "Description", "Manufacturer", "Availability"]
 
@@ -116,7 +116,7 @@ def header():
 
 
 if not os.path.exists(DEFAULT_INVENTORY):
-    st.error("لم يتم العثور على ملف inventory.xlsx داخل مجلد data")
+    st.error("The inventory.xlsx file was not found inside the data folder.")
     st.stop()
 
 inventory = load_inventory(DEFAULT_INVENTORY)
@@ -125,7 +125,7 @@ page = st.sidebar.radio("Menu", ["Customer Portal", "Request Quotation", "Admin 
 
 if page == "Customer Portal":
     header()
-    st.info("ابحث برقم القطعة أو اسم المصنع أو الوصف. الأسعار لا تظهر هنا، أرسل طلب عرض سعر للرد عليك.")
+    st.info("Search by part number, manufacturer, or description. Prices are not displayed here; please submit an RFQ and we will respond to you promptly.")
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         query = st.text_input("Search Part Number / Description / Manufacturer")
@@ -156,7 +156,7 @@ elif page == "Request Quotation":
         submitted = st.form_submit_button("Submit RFQ")
         if submitted:
             if not company or not contact or not email or not part:
-                st.error("فضلاً عبئ الحقول المطلوبة *")
+                st.error("Please complete all required fields marked with *.")
             else:
                 save_rfq({
                     "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -169,12 +169,12 @@ elif page == "Request Quotation":
                     "Notes": notes,
                     "Status": "New",
                 })
-                st.success("تم إرسال طلبك. سيتم التواصل معك قريبًا.")
+                st.success("Your request has been submitted successfully. We will contact you shortly.")
 
 elif page == "Admin Dashboard":
     pwd = st.sidebar.text_input("Admin Password", type="password")
     if pwd != ADMIN_PASSWORD:
-        st.warning("أدخل كلمة مرور الأدمن من الشريط الجانبي.")
+        st.warning("Please enter the admin password from the sidebar.")
         st.stop()
     header()
     st.subheader("Admin Dashboard")
@@ -192,20 +192,20 @@ elif page == "Admin Dashboard":
 elif page == "Upload Inventory":
     pwd = st.sidebar.text_input("Admin Password", type="password")
     if pwd != ADMIN_PASSWORD:
-        st.warning("أدخل كلمة مرور الأدمن من الشريط الجانبي.")
+        st.warning("Please enter the admin password from the sidebar.")
         st.stop()
     header()
     st.subheader("Upload New Inventory Excel")
-    st.warning("سيتم استبدال ملف inventory.xlsx الحالي بالملف الجديد.")
+    st.warning("The current inventory.xlsx file will be replaced with the newly uploaded file.")
     uploaded = st.file_uploader("Choose Excel file", type=["xlsx"])
     if uploaded and st.button("Replace Inventory"):
         save_uploaded_inventory(uploaded)
-        st.success("تم تحديث ملف المخزون. أعد تحميل الصفحة إذا لم تتحدث البيانات مباشرة.")
+        st.success("The inventory file has been updated successfully. Please refresh the page if the data does not update immediately.")
 
 elif page == "RFQ Inbox":
     pwd = st.sidebar.text_input("Admin Password", type="password")
     if pwd != ADMIN_PASSWORD:
-        st.warning("أدخل كلمة مرور الأدمن من الشريط الجانبي.")
+        st.warning("Please enter the admin password from the sidebar.")
         st.stop()
     header()
     st.subheader("Customer RFQs")
