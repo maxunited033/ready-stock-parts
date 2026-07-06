@@ -541,16 +541,6 @@ elif page == "Request Quotation":
     if "rfq_item_count" not in st.session_state:
         st.session_state.rfq_item_count = 1
 
-    add_col, reset_col = st.columns([1, 5])
-    with add_col:
-        if st.button("➕ Add Another Part"):
-            st.session_state.rfq_item_count += 1
-            st.rerun()
-    with reset_col:
-        if st.button("Reset Line Items"):
-            st.session_state.rfq_item_count = 1
-            st.rerun()
-
     with st.form("rfq_form"):
         st.markdown("### Customer Information")
         col1, col2 = st.columns(2)
@@ -583,6 +573,17 @@ elif page == "Request Quotation":
                     "Notes": str(item_notes).strip(),
                 })
 
+        add_part = st.form_submit_button("➕ Add Another Part", type="primary", use_container_width=True)
+        st.caption("Add as many part numbers as needed. Empty rows will be ignored.")
+        if add_part:
+            st.session_state.rfq_item_count += 1
+            st.rerun()
+
+        reset_items = st.form_submit_button("Reset Line Items")
+        if reset_items:
+            st.session_state.rfq_item_count = 1
+            st.rerun()
+
         overall_notes = st.text_area("Overall Notes / Equipment Details")
         uploaded_files = st.file_uploader(
             "Attach RFQ file (Excel or PDF)",
@@ -590,7 +591,7 @@ elif page == "Request Quotation":
             accept_multiple_files=True,
             help="Optional. Attach customer RFQ files, drawings, or Excel lists. Keep total attachments below 8 MB."
         )
-        submitted = st.form_submit_button("Submit RFQ")
+        submitted = st.form_submit_button("Submit RFQ", type="primary")
 
         if submitted:
             if not company or not contact or not email:
