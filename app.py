@@ -20,14 +20,14 @@ DATA_DIR = "data"
 DEFAULT_INVENTORY = os.path.join(DATA_DIR, "inventory.xlsx")
 RFQ_FILE = os.path.join(DATA_DIR, "customer_rfqs.xlsx")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Manutd@033")
-CONTACT_EMAIL = "mossab.rozi@gmail.com"
+CONTACT_EMAIL = "sales@readystockparts.com"
 CONTACT_MOBILE = "+966561261005"
 WHATSAPP_NUMBER = "966561261005"
 
 # Email notification settings via Resend API. Set these in Render > Environment.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Ready Stock Parts <sales@readystockparts.com>")
-RFQ_TO_EMAIL = os.environ.get("RFQ_TO_EMAIL", CONTACT_EMAIL)
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "sales@readystockparts.com")
+RFQ_TO_EMAIL = os.environ.get("RFQ_TO_EMAIL", "mossab.rozi@gmail.com")
 
 SAFE_COLUMNS = ["Part Number", "Description", "Manufacturer", "Availability"]
 
@@ -193,7 +193,7 @@ def to_excel_bytes(df):
 
 def send_rfq_email(row):
     """Send RFQ notification email through Resend API."""
-    if not RESEND_API_KEY:
+    if not RESEND_API_KEY.strip():
         return False, "Email notification is not configured. Add RESEND_API_KEY in Render Environment."
     if not RFQ_TO_EMAIL:
         return False, "RFQ recipient email is not configured. Add RFQ_TO_EMAIL in Render Environment."
@@ -250,8 +250,9 @@ Website: https://readystockparts.com
         "https://api.resend.com/emails",
         data=data,
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Authorization": f"Bearer {RESEND_API_KEY.strip()}",
             "Content-Type": "application/json",
+            "User-Agent": "ReadyStockParts/1.0",
         },
         method="POST",
     )
@@ -469,10 +470,8 @@ elif page == "Request Quotation":
                 save_rfq(rfq_row)
                 email_sent, email_message = send_rfq_email(rfq_row)
                 st.success("Your RFQ has been submitted successfully. We will contact you shortly.")
-                if email_sent:
-                    st.info(email_message)
-                else:
-                    st.warning(email_message)
+                if not email_sent:
+                    print(f"RFQ email notification failed: {email_message}")
 
     st.markdown("---")
     contact_box()
