@@ -3,6 +3,7 @@ from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote_plus
 import json
+import base64
 import urllib.request
 import urllib.error
 
@@ -26,7 +27,7 @@ WHATSAPP_NUMBER = "966561261005"
 
 # Email notification settings via Resend API. Set these in Render > Environment.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Ready Stock Parts <sales@readystockparts.com>")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "sales@readystockparts.com")
 RFQ_TO_EMAIL = os.environ.get("RFQ_TO_EMAIL", "mossab.rozi@gmail.com")
 
 SAFE_COLUMNS = ["Part Number", "Description", "Manufacturer", "Availability"]
@@ -159,18 +160,91 @@ def save_uploaded_inventory(uploaded_file):
     st.cache_data.clear()
 
 
+RFQ_COLUMNS = [
+    "Date", "Company", "Contact", "Email", "Mobile", "Line Items", "Attachment Names",
+    "Status", "Email Notification", "Email Details", "Resend ID"
+]
+
+
 def load_rfqs():
     if os.path.exists(RFQ_FILE):
-        return pd.read_excel(RFQ_FILE)
-    return pd.DataFrame(columns=["Date", "Company", "Contact", "Email", "Mobile", "Part Number", "Required Qty", "Notes", "Status", "Email Notification", "Email Details", "Resend ID"])
+        rfqs = pd.read_excel(RFQ_FILE)
+        for col in RFQ_COLUMNS:
+            if col not in rfqs.columns:
+                rfqs[col] = ""
+        return rfqs[RFQ_COLUMNS]
+    return pd.DataFrame(columns=RFQ_COLUMNS)
 
 
 def save_rfq(row):
     os.makedirs(DATA_DIR, exist_ok=True)
     rfqs = load_rfqs()
     rfqs = pd.concat([rfqs, pd.DataFrame([row])], ignore_index=True)
-    rfqs.to_excel(RFQ_FILE, index=False)
+    for col in RFQ_COLUMNS:
+        if col not in rfqs.columns:
+            rfqs[col] = ""
+    rfqs[RFQ_COLUMNS].to_excel(RFQ_FILE, index=False)
 
+
+def parse_line_items(row):
+    raw = row.get("Line Items", "")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            items = json.loads(raw)
+            if isinstance(items, list):
+                return items
+        except Exception:
+            return []
+    return []
+
+
+def line_items_to_text(items):
+    if not items:
+        return "No line items provided."
+    lines = []
+    for idx, item in enumerate(items, start=1):
+        lines.append(
+            f"{idx}. Part Number: {item.get('Part Number', '')} | "
+            f"Qty: {item.get('Qty', '')} | "
+            f"Manufacturer: {item.get('Manufacturer', '')} | "
+            f"Notes: {item.get('Notes', '')}"
+        )
+    return "\n".join(lines)
+
+
+def line_items_to_html_rows(items):
+    if not items:
+        return '<tr><td colspan="4" style="padding:8px; border:1px solid #e5e7eb;">No line items provided.</td></tr>'
+    rows = []
+    for idx, item in enumerate(items, start=1):
+        rows.append(
+            f"<tr>"
+            f"<td style='padding:8px; border:1px solid #e5e7eb;'>{idx}</td>"
+            f"<td style='padding:8px; border:1px solid #e5e7eb;'>{item.get('Part Number', '')}</td>"
+            f"<td style='padding:8px; border:1px solid #e5e7eb;'>{item.get('Qty', '')}</td>"
+            f"<td style='padding:8px; border:1px solid #e5e7eb;'>{item.get('Manufacturer', '')}</td>"
+            f"<td style='padding:8px; border:1px solid #e5e7eb;'>{item.get('Notes', '')}</td>"
+            f"</tr>"
+        )
+    return "".join(rows)
+
+
+def build_resend_attachments(uploaded_files):
+    attachments = []
+    total_bytes = 0
+    if not uploaded_files:
+        return attachments, None
+    for uploaded in uploaded_files:
+        content = uploaded.getvalue()
+        total_bytes += len(content)
+        # Keep total RFQ attachments comfortably below common API limits.
+        if total_bytes > 8 * 1024 * 1024:
+            return [], "Attachments exceed 8 MB total. RFQ was saved, but attachments were not emailed."
+        attachments.append({
+            "filename": uploaded.name,
+            "content": base64.b64encode(content).decode("utf-8"),
+        })
+    return attachments, None
 
 def to_excel_bytes(df):
     output = BytesIO()
@@ -191,31 +265,32 @@ def to_excel_bytes(df):
     return output.getvalue()
 
 
-def send_rfq_email(row):
-    """Send RFQ notification email through Resend API and return detailed result."""
-    api_key = RESEND_API_KEY.strip()
-    from_email = RESEND_FROM_EMAIL.strip() or "Ready Stock Parts <sales@readystockparts.com>"
-    to_email = RFQ_TO_EMAIL.strip() if isinstance(RFQ_TO_EMAIL, str) else RFQ_TO_EMAIL
+def send_rfq_email(row, uploaded_files=None):
+    """Send RFQ notification email through Resend API."""
+    if not RESEND_API_KEY.strip():
+        return False, "Email notification is not configured. Add RESEND_API_KEY in Render Environment.", ""
+    if not RFQ_TO_EMAIL:
+        return False, "RFQ recipient email is not configured. Add RFQ_TO_EMAIL in Render Environment.", ""
 
-    if not api_key:
-        return False, "Missing RESEND_API_KEY in Render Environment.", ""
-    if not to_email:
-        return False, "Missing RFQ_TO_EMAIL in Render Environment.", ""
-
-    subject = f"New RFQ Received - {row.get('Part Number', '')}"
+    items = parse_line_items(row)
+    item_count = len(items)
+    first_part = items[0].get("Part Number", "") if items else "No Part Number"
+    subject = f"New RFQ Received - {row.get('Company', '')} - {item_count} Item(s) - {first_part}"
     customer_email = str(row.get("Email", "")).strip()
 
-    text_body = f"""New RFQ received from Ready Stock Parts website.
+    text_body = f"""
+New RFQ received from Ready Stock Parts website.
 
 Date: {row.get('Date', '')}
 Company: {row.get('Company', '')}
 Contact Person: {row.get('Contact', '')}
-Customer Email: {row.get('Email', '')}
+Email: {row.get('Email', '')}
 Mobile / WhatsApp: {row.get('Mobile', '')}
-Part Number: {row.get('Part Number', '')}
-Required Qty: {row.get('Required Qty', '')}
-Notes: {row.get('Notes', '')}
+Attachment Names: {row.get('Attachment Names', '')}
 Status: {row.get('Status', '')}
+
+Line Items:
+{line_items_to_text(items)}
 
 Website: https://readystockparts.com
 """
@@ -224,29 +299,40 @@ Website: https://readystockparts.com
     <div style="font-family: Arial, sans-serif; line-height:1.55; color:#0f172a;">
       <h2 style="margin-bottom:8px;">New RFQ Received</h2>
       <p>A new quotation request was submitted through <b>Ready Stock Parts</b>.</p>
-      <table style="border-collapse:collapse; width:100%; max-width:720px;">
+      <table style="border-collapse:collapse; width:100%; max-width:760px; margin-bottom:16px;">
         <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Date</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Date', '')}</td></tr>
         <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Company</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Company', '')}</td></tr>
         <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Contact</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Contact', '')}</td></tr>
         <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Email</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Email', '')}</td></tr>
         <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Mobile / WhatsApp</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Mobile', '')}</td></tr>
-        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Part Number</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Part Number', '')}</td></tr>
-        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Required Qty</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Required Qty', '')}</td></tr>
-        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Notes</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Notes', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Attachments</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Attachment Names', '')}</td></tr>
+      </table>
+      <h3>Requested Line Items</h3>
+      <table style="border-collapse:collapse; width:100%; max-width:900px;">
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">#</th>
+          <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Part Number</th>
+          <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Qty</th>
+          <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Manufacturer</th>
+          <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Notes</th>
+        </tr>
+        {line_items_to_html_rows(items)}
       </table>
       <p style="margin-top:14px;"><a href="https://readystockparts.com">Open Ready Stock Parts</a></p>
     </div>
     """
 
+    attachments, attachment_warning = build_resend_attachments(uploaded_files or [])
+
     payload = {
-        "from": from_email,
-        "to": [to_email],
+        "from": RESEND_FROM_EMAIL,
+        "to": [RFQ_TO_EMAIL],
         "subject": subject,
         "html": html_body,
         "text": text_body,
     }
-
-    # Let Gmail reply go directly to the customer who submitted the RFQ.
+    if attachments:
+        payload["attachments"] = attachments
     if customer_email and "@" in customer_email:
         payload["reply_to"] = customer_email
 
@@ -255,10 +341,9 @@ Website: https://readystockparts.com
         "https://api.resend.com/emails",
         data=data,
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {RESEND_API_KEY.strip()}",
             "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "ReadyStockParts/1.0 (https://readystockparts.com)",
+            "User-Agent": "ReadyStockParts/1.0",
         },
         method="POST",
     )
@@ -268,22 +353,20 @@ Website: https://readystockparts.com
             response_body = response.read().decode("utf-8", errors="ignore")
             resend_id = ""
             try:
-                parsed = json.loads(response_body) if response_body else {}
-                resend_id = parsed.get("id", "")
+                resend_id = json.loads(response_body).get("id", "")
             except Exception:
                 pass
-
             if 200 <= response.status < 300:
-                return True, f"Email notification sent successfully. Resend response: {response_body}", resend_id
-
+                msg = "Email notification sent successfully via sales@readystockparts.com."
+                if attachment_warning:
+                    msg += " " + attachment_warning
+                return True, msg, resend_id
             return False, f"Resend returned status {response.status}: {response_body}", resend_id
-
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="ignore")
         return False, f"HTTP {exc.code}: {error_body}", ""
     except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}", ""
-
+        return False, str(exc), ""
 
 def search_df(df, query, manufacturer, availability):
     f = df.copy()
@@ -453,47 +536,97 @@ elif page == "Search Parts":
 elif page == "Request Quotation":
     hero()
     st.subheader("Request for Quotation")
-    st.caption("Submit your requirement and our team will respond with availability, pricing, and delivery options.")
+    st.caption("Submit multiple spare parts in one RFQ. You may also attach an Excel or PDF RFQ file.")
+
+    if "rfq_item_count" not in st.session_state:
+        st.session_state.rfq_item_count = 1
+
+    add_col, reset_col = st.columns([1, 5])
+    with add_col:
+        if st.button("➕ Add Another Part"):
+            st.session_state.rfq_item_count += 1
+            st.rerun()
+    with reset_col:
+        if st.button("Reset Line Items"):
+            st.session_state.rfq_item_count = 1
+            st.rerun()
 
     with st.form("rfq_form"):
+        st.markdown("### Customer Information")
         col1, col2 = st.columns(2)
         with col1:
             company = st.text_input("Company Name *")
             contact = st.text_input("Contact Person *")
             email = st.text_input("Email *")
-            mobile = st.text_input("Mobile / WhatsApp")
         with col2:
-            part = st.text_input("Part Number *")
-            qty = st.number_input("Required Quantity", min_value=1, value=1)
-            notes = st.text_area("Notes / Equipment Details")
+            mobile = st.text_input("Mobile / WhatsApp")
+            project_ref = st.text_input("Project / RFQ Reference")
+
+        st.markdown("### RFQ Line Items")
+        st.caption("Enter one or more part numbers and quantities. Empty rows will be ignored.")
+        line_items = []
+        for i in range(st.session_state.rfq_item_count):
+            cols = st.columns([2.2, 0.8, 1.4, 2.2])
+            with cols[0]:
+                part_no = st.text_input(f"Part Number {i + 1}" + (" *" if i == 0 else ""), key=f"rfq_part_{i}")
+            with cols[1]:
+                qty = st.number_input(f"Qty {i + 1}", min_value=1, value=1, key=f"rfq_qty_{i}")
+            with cols[2]:
+                manufacturer = st.text_input(f"Manufacturer {i + 1}", key=f"rfq_manufacturer_{i}")
+            with cols[3]:
+                item_notes = st.text_input(f"Line Notes {i + 1}", key=f"rfq_item_notes_{i}")
+            if str(part_no).strip():
+                line_items.append({
+                    "Part Number": str(part_no).strip(),
+                    "Qty": int(qty),
+                    "Manufacturer": str(manufacturer).strip(),
+                    "Notes": str(item_notes).strip(),
+                })
+
+        overall_notes = st.text_area("Overall Notes / Equipment Details")
+        uploaded_files = st.file_uploader(
+            "Attach RFQ file (Excel or PDF)",
+            type=["xlsx", "xls", "pdf"],
+            accept_multiple_files=True,
+            help="Optional. Attach customer RFQ files, drawings, or Excel lists. Keep total attachments below 8 MB."
+        )
         submitted = st.form_submit_button("Submit RFQ")
+
         if submitted:
-            if not company or not contact or not email or not part:
-                st.error("Please complete all required fields marked with *.")
+            if not company or not contact or not email:
+                st.error("Please complete Company Name, Contact Person, and Email.")
+            elif not line_items:
+                st.error("Please enter at least one Part Number.")
             else:
+                if overall_notes:
+                    line_items.append({
+                        "Part Number": "Overall Notes",
+                        "Qty": "",
+                        "Manufacturer": "",
+                        "Notes": overall_notes.strip(),
+                    })
+                attachment_names = ", ".join([f.name for f in uploaded_files]) if uploaded_files else ""
                 rfq_row = {
                     "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Company": company,
                     "Contact": contact,
                     "Email": email,
                     "Mobile": mobile,
-                    "Part Number": part,
-                    "Required Qty": qty,
-                    "Notes": notes,
+                    "Line Items": json.dumps(line_items, ensure_ascii=False),
+                    "Attachment Names": attachment_names,
                     "Status": "New",
+                    "Email Notification": "Pending",
+                    "Email Details": "",
+                    "Resend ID": "",
                 }
-                email_sent, email_message, resend_id = send_rfq_email(rfq_row)
+                email_sent, email_message, resend_id = send_rfq_email(rfq_row, uploaded_files)
                 rfq_row["Email Notification"] = "Sent" if email_sent else "Failed"
                 rfq_row["Email Details"] = email_message
                 rfq_row["Resend ID"] = resend_id
                 save_rfq(rfq_row)
-
                 st.success("Your RFQ has been submitted successfully. We will contact you shortly.")
-                if email_sent:
-                    st.info("Email notification sent to Ready Stock Parts team.")
-                else:
-                    st.warning("Your RFQ was saved. Email notification is pending; our team can still see it in the RFQ Inbox.")
-                    print(f"RFQ email notification failed: {email_message}")
+                if not email_sent:
+                    st.warning("Your RFQ was saved. Email notification did not complete, but our team can still see it in the RFQ Inbox.")
 
     st.markdown("---")
     contact_box()
