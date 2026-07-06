@@ -26,7 +26,7 @@ WHATSAPP_NUMBER = "966561261005"
 
 # Email notification settings via Resend API. Set these in Render > Environment.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "sales@readystockparts.com")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Ready Stock Parts <sales@readystockparts.com>")
 RFQ_TO_EMAIL = os.environ.get("RFQ_TO_EMAIL", "mossab.rozi@gmail.com")
 
 SAFE_COLUMNS = ["Part Number", "Description", "Manufacturer", "Availability"]
@@ -162,7 +162,7 @@ def save_uploaded_inventory(uploaded_file):
 def load_rfqs():
     if os.path.exists(RFQ_FILE):
         return pd.read_excel(RFQ_FILE)
-    return pd.DataFrame(columns=["Date", "Company", "Contact", "Email", "Mobile", "Part Number", "Required Qty", "Notes", "Status"])
+    return pd.DataFrame(columns=["Date", "Company", "Contact", "Email", "Mobile", "Part Number", "Required Qty", "Notes", "Status", "Email Notification", "Email Details", "Resend ID"])
 
 
 def save_rfq(row):
@@ -192,22 +192,25 @@ def to_excel_bytes(df):
 
 
 def send_rfq_email(row):
-    """Send RFQ notification email through Resend API."""
-    if not RESEND_API_KEY.strip():
-        return False, "Email notification is not configured. Add RESEND_API_KEY in Render Environment."
-    if not RFQ_TO_EMAIL:
-        return False, "RFQ recipient email is not configured. Add RFQ_TO_EMAIL in Render Environment."
+    """Send RFQ notification email through Resend API and return detailed result."""
+    api_key = RESEND_API_KEY.strip()
+    from_email = RESEND_FROM_EMAIL.strip() or "Ready Stock Parts <sales@readystockparts.com>"
+    to_email = RFQ_TO_EMAIL.strip() if isinstance(RFQ_TO_EMAIL, str) else RFQ_TO_EMAIL
+
+    if not api_key:
+        return False, "Missing RESEND_API_KEY in Render Environment.", ""
+    if not to_email:
+        return False, "Missing RFQ_TO_EMAIL in Render Environment.", ""
 
     subject = f"New RFQ Received - {row.get('Part Number', '')}"
     customer_email = str(row.get("Email", "")).strip()
 
-    text_body = f"""
-New RFQ received from Ready Stock Parts website.
+    text_body = f"""New RFQ received from Ready Stock Parts website.
 
 Date: {row.get('Date', '')}
 Company: {row.get('Company', '')}
 Contact Person: {row.get('Contact', '')}
-Email: {row.get('Email', '')}
+Customer Email: {row.get('Email', '')}
 Mobile / WhatsApp: {row.get('Mobile', '')}
 Part Number: {row.get('Part Number', '')}
 Required Qty: {row.get('Required Qty', '')}
@@ -236,12 +239,14 @@ Website: https://readystockparts.com
     """
 
     payload = {
-        "from": RESEND_FROM_EMAIL,
-        "to": [RFQ_TO_EMAIL],
+        "from": from_email,
+        "to": [to_email],
         "subject": subject,
         "html": html_body,
         "text": text_body,
     }
+
+    # Let Gmail reply go directly to the customer who submitted the RFQ.
     if customer_email and "@" in customer_email:
         payload["reply_to"] = customer_email
 
@@ -250,24 +255,34 @@ Website: https://readystockparts.com
         "https://api.resend.com/emails",
         data=data,
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY.strip()}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "ReadyStockParts/1.0",
+            "Accept": "application/json",
+            "User-Agent": "ReadyStockParts/1.0 (https://readystockparts.com)",
         },
         method="POST",
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            if 200 <= response.status < 300:
-                return True, "Email notification sent successfully via sales@readystockparts.com."
+        with urllib.request.urlopen(request, timeout=25) as response:
             response_body = response.read().decode("utf-8", errors="ignore")
-            return False, f"RFQ saved, but Resend returned status {response.status}: {response_body}"
+            resend_id = ""
+            try:
+                parsed = json.loads(response_body) if response_body else {}
+                resend_id = parsed.get("id", "")
+            except Exception:
+                pass
+
+            if 200 <= response.status < 300:
+                return True, f"Email notification sent successfully. Resend response: {response_body}", resend_id
+
+            return False, f"Resend returned status {response.status}: {response_body}", resend_id
+
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="ignore")
-        return False, f"RFQ saved, but email notification failed: {exc.code} {error_body}"
+        return False, f"HTTP {exc.code}: {error_body}", ""
     except Exception as exc:
-        return False, f"RFQ saved, but email notification failed: {exc}"
+        return False, f"{type(exc).__name__}: {exc}", ""
 
 
 def search_df(df, query, manufacturer, availability):
@@ -467,10 +482,17 @@ elif page == "Request Quotation":
                     "Notes": notes,
                     "Status": "New",
                 }
+                email_sent, email_message, resend_id = send_rfq_email(rfq_row)
+                rfq_row["Email Notification"] = "Sent" if email_sent else "Failed"
+                rfq_row["Email Details"] = email_message
+                rfq_row["Resend ID"] = resend_id
                 save_rfq(rfq_row)
-                email_sent, email_message = send_rfq_email(rfq_row)
+
                 st.success("Your RFQ has been submitted successfully. We will contact you shortly.")
-                if not email_sent:
+                if email_sent:
+                    st.info("Email notification sent to Ready Stock Parts team.")
+                else:
+                    st.warning("Your RFQ was saved. Email notification is pending; our team can still see it in the RFQ Inbox.")
                     print(f"RFQ email notification failed: {email_message}")
 
     st.markdown("---")
