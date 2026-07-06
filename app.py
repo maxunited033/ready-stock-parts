@@ -10,7 +10,7 @@ st.set_page_config(
     page_title="Ready Stock Parts | Industrial OEM Spare Parts",
     page_icon="⚙️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 DATA_DIR = "data"
@@ -68,6 +68,37 @@ def inject_css():
         }
         .footer-box {border-top: 1px solid #e5e7eb; margin-top: 2rem; padding-top: 1.2rem; color: #64748b;}
         .small-note {font-size:0.88rem; color:#64748b;}
+        section[data-testid="stSidebar"] {display: none !important;}
+        div[data-testid="collapsedControl"] {display: none !important;}
+        .rsp-navbar {
+            position: sticky; top: 0; z-index: 999;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 28px rgba(15,23,42,0.06);
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+        }
+        .rsp-brand {font-weight: 900; color: #0f172a; font-size: 1.1rem; letter-spacing: -0.02em;}
+        .rsp-brand span {color: #2563eb;}
+        .rsp-links {display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;}
+        .rsp-links a {
+            color:#334155 !important; text-decoration:none !important;
+            padding:0.5rem 0.75rem; border-radius:999px; font-weight:650; font-size:0.92rem;
+        }
+        .rsp-links a:hover {background:#eff6ff; color:#1d4ed8 !important;}
+        .rsp-links a.active {background:#1e3a8a; color:white !important;}
+        .rsp-cta {background:#0f172a !important; color:white !important;}
+        @media (max-width: 760px) {
+            .block-container {padding-left: 1rem; padding-right: 1rem;}
+            .hero {padding: 1.5rem 1.2rem; border-radius: 18px;}
+            .hero h1 {font-size: 2rem;}
+            .rsp-navbar {border-radius: 14px; padding: 0.65rem;}
+            .rsp-links {width:100%; overflow-x:auto; flex-wrap:nowrap; padding-bottom:0.15rem;}
+            .rsp-links a {white-space:nowrap; font-size:0.86rem;}
+        }
         .availability-available {color:#15803d; font-weight:700;}
         .availability-limited {color:#b45309; font-weight:700;}
         </style>
@@ -196,10 +227,61 @@ def contact_box():
 
 
 def require_admin():
-    pwd = st.sidebar.text_input("Admin Password", type="password")
+    with st.container():
+        pwd = st.text_input("Admin Password", type="password", placeholder="Enter admin password")
     if pwd != ADMIN_PASSWORD:
-        st.warning("Please enter the admin password from the sidebar to access this section.")
+        st.warning("Please enter the admin password to access this section.")
         st.stop()
+
+
+PAGES = {
+    "home": "Home",
+    "search": "Search Parts",
+    "rfq": "Request Quotation",
+    "brands": "OEM Brands",
+    "about": "About",
+    "admin": "Admin Dashboard",
+    "upload": "Upload Inventory",
+    "inbox": "RFQ Inbox",
+}
+
+PAGE_TO_SLUG = {v: k for k, v in PAGES.items()}
+
+
+def get_current_page():
+    try:
+        slug = st.query_params.get("page", "home")
+    except Exception:
+        slug = "home"
+    if isinstance(slug, list):
+        slug = slug[0] if slug else "home"
+    return PAGES.get(slug, "Home")
+
+
+def top_navigation():
+    current_page = get_current_page()
+    current_slug = PAGE_TO_SLUG.get(current_page, "home")
+    links = []
+    main_links = [
+        ("home", "Home"),
+        ("search", "Search Parts"),
+        ("rfq", "Request RFQ"),
+        ("brands", "OEM Brands"),
+        ("about", "About"),
+        ("admin", "Admin"),
+    ]
+    for slug, label in main_links:
+        active = " active" if slug == current_slug else ""
+        extra = " rsp-cta" if slug == "rfq" else ""
+        links.append('<a class="{}{}" href="?page={}">{}</a>'.format(active, extra, slug, label))
+    nav_html = """
+        <div class="rsp-navbar">
+            <div class="rsp-brand">Ready Stock <span>Parts</span></div>
+            <div class="rsp-links">{links}</div>
+        </div>
+    """.format(links="".join(links))
+    st.markdown(nav_html, unsafe_allow_html=True)
+    return current_page
 
 
 inject_css()
@@ -211,15 +293,7 @@ if not os.path.exists(DEFAULT_INVENTORY):
 inventory = load_inventory(DEFAULT_INVENTORY)
 public_inventory = inventory[inventory["Qty"] > 0].copy()
 
-st.sidebar.markdown("## Ready Stock Parts")
-st.sidebar.caption("Industrial OEM Spare Parts Portal")
-page = st.sidebar.radio(
-    "Navigation",
-    ["Home", "Search Parts", "Request Quotation", "OEM Brands", "About", "Admin Dashboard", "Upload Inventory", "RFQ Inbox"],
-)
-st.sidebar.divider()
-st.sidebar.caption(f"Email: {CONTACT_EMAIL}")
-st.sidebar.caption(f"WhatsApp: {CONTACT_MOBILE}")
+page = top_navigation()
 
 if page == "Home":
     hero()
@@ -339,6 +413,7 @@ elif page == "About":
 elif page == "Admin Dashboard":
     require_admin()
     hero()
+    st.markdown("[Upload Inventory](?page=upload) &nbsp; | &nbsp; [RFQ Inbox](?page=inbox)", unsafe_allow_html=True)
     st.subheader("Admin Dashboard")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Inventory Items", f"{len(inventory):,}")
