@@ -2,9 +2,9 @@ import os
 from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote_plus
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import json
+import urllib.request
+import urllib.error
 
 import pandas as pd
 import streamlit as st
@@ -24,12 +24,9 @@ CONTACT_EMAIL = "mossab.rozi@gmail.com"
 CONTACT_MOBILE = "+966561261005"
 WHATSAPP_NUMBER = "966561261005"
 
-# Email notification settings. Set these in Render > Environment.
-SMTP_HOST = os.environ.get("SMTP_HOST", "")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
-SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER or CONTACT_EMAIL)
+# Email notification settings via Resend API. Set these in Render > Environment.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Ready Stock Parts <sales@readystockparts.com>")
 RFQ_TO_EMAIL = os.environ.get("RFQ_TO_EMAIL", CONTACT_EMAIL)
 
 SAFE_COLUMNS = ["Part Number", "Description", "Manufacturer", "Availability"]
@@ -195,13 +192,16 @@ def to_excel_bytes(df):
 
 
 def send_rfq_email(row):
-    """Send RFQ notification email if SMTP environment variables are configured."""
-    required = [SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, RFQ_TO_EMAIL]
-    if not all(required):
-        return False, "Email notification is not configured. The RFQ was saved in the RFQ Inbox."
+    """Send RFQ notification email through Resend API."""
+    if not RESEND_API_KEY:
+        return False, "Email notification is not configured. Add RESEND_API_KEY in Render Environment."
+    if not RFQ_TO_EMAIL:
+        return False, "RFQ recipient email is not configured. Add RFQ_TO_EMAIL in Render Environment."
 
-    subject = f"New RFQ - {row.get('Company', '')} - {row.get('Part Number', '')}"
-    body = f"""
+    subject = f"New RFQ Received - {row.get('Part Number', '')}"
+    customer_email = str(row.get("Email", "")).strip()
+
+    text_body = f"""
 New RFQ received from Ready Stock Parts website.
 
 Date: {row.get('Date', '')}
@@ -217,18 +217,54 @@ Status: {row.get('Status', '')}
 Website: https://readystockparts.com
 """
 
-    msg = MIMEMultipart()
-    msg["From"] = SMTP_FROM
-    msg["To"] = RFQ_TO_EMAIL
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain", "utf-8"))
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; line-height:1.55; color:#0f172a;">
+      <h2 style="margin-bottom:8px;">New RFQ Received</h2>
+      <p>A new quotation request was submitted through <b>Ready Stock Parts</b>.</p>
+      <table style="border-collapse:collapse; width:100%; max-width:720px;">
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Date</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Date', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Company</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Company', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Contact</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Contact', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Email</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Email', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Mobile / WhatsApp</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Mobile', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Part Number</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Part Number', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Required Qty</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Required Qty', '')}</td></tr>
+        <tr><td style="padding:8px; border:1px solid #e5e7eb;"><b>Notes</b></td><td style="padding:8px; border:1px solid #e5e7eb;">{row.get('Notes', '')}</td></tr>
+      </table>
+      <p style="margin-top:14px;"><a href="https://readystockparts.com">Open Ready Stock Parts</a></p>
+    </div>
+    """
+
+    payload = {
+        "from": RESEND_FROM_EMAIL,
+        "to": [RFQ_TO_EMAIL],
+        "subject": subject,
+        "html": html_body,
+        "text": text_body,
+    }
+    if customer_email and "@" in customer_email:
+        payload["reply_to"] = customer_email
+
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM, [RFQ_TO_EMAIL], msg.as_string())
-        return True, "Email notification sent successfully."
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if 200 <= response.status < 300:
+                return True, "Email notification sent successfully via sales@readystockparts.com."
+            response_body = response.read().decode("utf-8", errors="ignore")
+            return False, f"RFQ saved, but Resend returned status {response.status}: {response_body}"
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="ignore")
+        return False, f"RFQ saved, but email notification failed: {exc.code} {error_body}"
     except Exception as exc:
         return False, f"RFQ saved, but email notification failed: {exc}"
 
