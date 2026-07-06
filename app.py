@@ -2,6 +2,9 @@ import os
 from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote_plus
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 import pandas as pd
 import streamlit as st
@@ -20,6 +23,14 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Manutd@033")
 CONTACT_EMAIL = "mossab.rozi@gmail.com"
 CONTACT_MOBILE = "+966561261005"
 WHATSAPP_NUMBER = "966561261005"
+
+# Email notification settings. Set these in Render > Environment.
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER or CONTACT_EMAIL)
+RFQ_TO_EMAIL = os.environ.get("RFQ_TO_EMAIL", CONTACT_EMAIL)
 
 SAFE_COLUMNS = ["Part Number", "Description", "Manufacturer", "Availability"]
 
@@ -170,10 +181,56 @@ def to_excel_bytes(df):
         df.to_excel(writer, index=False, sheet_name="Data")
         ws = writer.sheets["Data"]
         for i, col in enumerate(df.columns):
-            width = min(max(len(str(col)) + 4, int(df[col].astype(str).str.len().quantile(0.9)) + 2 if len(df) else 14), 48)
+            if len(df):
+                lengths = df[col].fillna("").astype(str).str.len()
+                q90 = lengths.quantile(0.9)
+                if pd.isna(q90):
+                    q90 = 14
+                width = min(max(len(str(col)) + 4, int(q90) + 2), 48)
+            else:
+                width = max(len(str(col)) + 4, 14)
             ws.set_column(i, i, width)
     output.seek(0)
     return output.getvalue()
+
+
+def send_rfq_email(row):
+    """Send RFQ notification email if SMTP environment variables are configured."""
+    required = [SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, RFQ_TO_EMAIL]
+    if not all(required):
+        return False, "Email notification is not configured. The RFQ was saved in the RFQ Inbox."
+
+    subject = f"New RFQ - {row.get('Company', '')} - {row.get('Part Number', '')}"
+    body = f"""
+New RFQ received from Ready Stock Parts website.
+
+Date: {row.get('Date', '')}
+Company: {row.get('Company', '')}
+Contact Person: {row.get('Contact', '')}
+Email: {row.get('Email', '')}
+Mobile / WhatsApp: {row.get('Mobile', '')}
+Part Number: {row.get('Part Number', '')}
+Required Qty: {row.get('Required Qty', '')}
+Notes: {row.get('Notes', '')}
+Status: {row.get('Status', '')}
+
+Website: https://readystockparts.com
+"""
+
+    msg = MIMEMultipart()
+    msg["From"] = SMTP_FROM
+    msg["To"] = RFQ_TO_EMAIL
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_FROM, [RFQ_TO_EMAIL], msg.as_string())
+        return True, "Email notification sent successfully."
+    except Exception as exc:
+        return False, f"RFQ saved, but email notification failed: {exc}"
 
 
 def search_df(df, query, manufacturer, availability):
@@ -362,7 +419,7 @@ elif page == "Request Quotation":
             if not company or not contact or not email or not part:
                 st.error("Please complete all required fields marked with *.")
             else:
-                save_rfq({
+                rfq_row = {
                     "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Company": company,
                     "Contact": contact,
@@ -372,8 +429,14 @@ elif page == "Request Quotation":
                     "Required Qty": qty,
                     "Notes": notes,
                     "Status": "New",
-                })
+                }
+                save_rfq(rfq_row)
+                email_sent, email_message = send_rfq_email(rfq_row)
                 st.success("Your RFQ has been submitted successfully. We will contact you shortly.")
+                if email_sent:
+                    st.info(email_message)
+                else:
+                    st.warning(email_message)
 
     st.markdown("---")
     contact_box()
