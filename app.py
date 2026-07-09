@@ -66,9 +66,22 @@ def inject_css():
         }
         .card {
             border: 1px solid #e5e7eb; border-radius: 18px; padding: 1.2rem;
-            background: white; box-shadow: 0 8px 28px rgba(15,23,42,0.06); height: 100%;
+            background: #ffffff !important; box-shadow: 0 8px 28px rgba(15,23,42,0.06); height: 100%;
+            color: #0f172a !important;
         }
-        .card h3 {margin-top: 0; color: #0f172a;}
+        .card h3 {margin-top: 0; color: #0f172a !important;}
+        .card p, .card b, .card span {color: #0f172a !important;}
+        .card .muted {color: #475569 !important;}
+        .card a {color: #0f766e !important; font-weight: 700;}
+        .contact-card {
+            background: #ffffff !important;
+            border: 1px solid #dbeafe !important;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.10) !important;
+        }
+        .contact-card p {font-size: 1rem;}
+        .contact-card .contact-line {margin: 0.72rem 0;}
+        .contact-card .contact-label {color: #475569 !important; font-weight: 700;}
+        .contact-card .contact-value {color: #0f172a !important; font-weight: 800;}
         .muted {color: #64748b;}
         .section-title {font-size: 1.4rem; font-weight: 800; color: #0f172a; margin: 1.2rem 0 0.8rem;}
         .brand-pill {
@@ -95,11 +108,24 @@ def inject_css():
         .rsp-links {display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;}
         .rsp-links a {
             color:#334155 !important; text-decoration:none !important;
-            padding:0.5rem 0.75rem; border-radius:999px; font-weight:650; font-size:0.92rem;
+            padding:0.55rem 0.85rem; border-radius:999px; font-weight:700; font-size:0.94rem;
         }
         .rsp-links a:hover {background:#eff6ff; color:#1d4ed8 !important;}
-        .rsp-links a.active {background:#1e3a8a; color:white !important;}
-        .rsp-cta {background:#0f172a !important; color:white !important;}
+        .rsp-links a.active {background:#1e3a8a; color:#ffffff !important;}
+        .rsp-cta {
+            background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+            color:#ffffff !important;
+            border: 1px solid rgba(255,255,255,0.35) !important;
+            box-shadow: 0 8px 22px rgba(37,99,235,0.35);
+            padding: 0.68rem 1.05rem !important;
+            font-weight: 900 !important;
+        }
+        .rsp-cta::before {content: "📄 ";}
+        .rsp-cta:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #0284c7 100%) !important;
+            color:#ffffff !important;
+            transform: translateY(-1px);
+        }
         @media (max-width: 760px) {
             .block-container {padding-left: 1rem; padding-right: 1rem;}
             .hero {padding: 1.5rem 1.2rem; border-radius: 18px;}
@@ -406,12 +432,12 @@ def contact_box():
     whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={whatsapp_text}"
     st.markdown(
         f"""
-        <div class="card">
+        <div class="card contact-card">
             <h3>Contact Ready Stock Parts</h3>
             <p class="muted">For urgent requirements, RFQs, or technical spare parts identification.</p>
-            <p><b>Email:</b> {CONTACT_EMAIL}</p>
-            <p><b>Mobile / WhatsApp:</b> {CONTACT_MOBILE}</p>
-            <p><a href="{whatsapp_url}" target="_blank">Open WhatsApp Inquiry</a></p>
+            <p class="contact-line"><span class="contact-label">Email:</span> <span class="contact-value">{CONTACT_EMAIL}</span></p>
+            <p class="contact-line"><span class="contact-label">Mobile / WhatsApp:</span> <span class="contact-value">{CONTACT_MOBILE}</span></p>
+            <p><a href="{whatsapp_url}" target="_blank">💬 Open WhatsApp Inquiry</a></p>
         </div>
         """,
         unsafe_allow_html=True,
