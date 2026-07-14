@@ -794,107 +794,126 @@ elif page == "Contact Us":
 
 elif page == "Privacy Policy":
     hero()
-    st.markdown(
-        f"""
-        <div class="policy-card">
-            <h2>Privacy Policy</h2>
-            <p class="policy-muted">Last updated: July 2026</p>
-            <p>Ready Stock Parts respects the privacy of customers and website visitors. This policy explains how information submitted through the website is handled.</p>
-
-            <h3>Information We Collect</h3>
-            <ul>
-                <li>Company name, contact name, email address, and telephone or WhatsApp number.</li>
-                <li>Part numbers, quantities, equipment details, and quotation requirements.</li>
-                <li>Files voluntarily uploaded with an RFQ, including Excel and PDF documents.</li>
-            </ul>
-
-            <h3>How We Use Information</h3>
-            <ul>
-                <li>To review availability and prepare commercial quotations.</li>
-                <li>To contact customers regarding their RFQs or technical inquiries.</li>
-                <li>To improve website functionality, customer service, and inventory planning.</li>
-            </ul>
-
-            <h3>Information Sharing</h3>
-            <p>Customer information is not sold. Information may be shared only with relevant suppliers, logistics providers, or service partners when necessary to process a quotation or order.</p>
-
-            <h3>Data Security</h3>
-            <p>Reasonable technical and organizational measures are used to protect submitted information. However, no internet transmission method can be guaranteed to be completely secure.</p>
-
-            <h3>Contact</h3>
-            <p>Questions regarding this policy may be sent to <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.subheader("Privacy Policy")
+    st.caption("Last updated: July 2026")
+    st.write(
+        "Ready Stock Parts respects the privacy of customers and website visitors. "
+        "This policy explains how information submitted through the website is handled."
     )
+
+    st.markdown("### Information We Collect")
+    st.markdown(
+        """
+- Company name, contact name, email address, and telephone or WhatsApp number.
+- Part numbers, quantities, equipment details, and quotation requirements.
+- Files voluntarily uploaded with an RFQ, including Excel and PDF documents.
+        """
+    )
+
+    st.markdown("### How We Use Information")
+    st.markdown(
+        """
+- To review availability and prepare commercial quotations.
+- To contact customers regarding their RFQs or technical inquiries.
+- To improve website functionality, customer service, and inventory planning.
+        """
+    )
+
+    st.markdown("### Information Sharing")
+    st.write(
+        "Customer information is not sold. Information may be shared only with relevant "
+        "suppliers, logistics providers, or service partners when necessary to process a quotation or order."
+    )
+
+    st.markdown("### Data Security")
+    st.write(
+        "Reasonable technical and organizational measures are used to protect submitted information. "
+        "However, no internet transmission method can be guaranteed to be completely secure."
+    )
+
+    st.markdown("### Contact")
+    st.markdown(f"Questions regarding this policy may be sent to [{CONTACT_EMAIL}](mailto:{CONTACT_EMAIL}).")
 
 elif page == "Terms of Use":
     hero()
-    st.markdown(
-        f"""
-        <div class="policy-card">
-            <h2>Terms of Use</h2>
-            <p class="policy-muted">Last updated: July 2026</p>
+    st.subheader("Terms of Use")
+    st.caption("Last updated: July 2026")
 
-            <h3>Website Purpose</h3>
-            <p>This website is a B2B industrial spare parts inquiry and RFQ platform. Information shown on the website is provided for general commercial reference only.</p>
-
-            <h3>Quotations and Availability</h3>
-            <ul>
-                <li>Website availability indicators are not a binding stock commitment.</li>
-                <li>Prices, delivery dates, warranty terms, and commercial conditions are valid only when included in an official written quotation.</li>
-                <li>All quotations remain subject to final stock confirmation and supplier approval.</li>
-            </ul>
-
-            <h3>Product and Trademark Information</h3>
-            <p>Product names, OEM names, trademarks, and logos remain the property of their respective owners. Their appearance on this website does not imply ownership by Ready Stock Parts.</p>
-
-            <h3>Customer Responsibility</h3>
-            <p>Customers are responsible for confirming part-number accuracy, equipment compatibility, required quantities, and technical specifications before placing an order.</p>
-
-            <h3>Limitation of Liability</h3>
-            <p>Ready Stock Parts is not liable for losses resulting from reliance on preliminary website information, incorrect customer data, or delays outside its reasonable control.</p>
-
-            <h3>Contact</h3>
-            <p>For questions regarding these terms, contact <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown("### Website Purpose")
+    st.write(
+        "This website is a B2B industrial spare parts inquiry and RFQ platform. "
+        "Information shown on the website is provided for general commercial reference only."
     )
+
+    st.markdown("### Quotations and Availability")
+    st.markdown(
+        """
+- Website availability indicators are not a binding stock commitment.
+- Prices, delivery dates, warranty terms, and commercial conditions are valid only when included in an official written quotation.
+- All quotations remain subject to final stock confirmation and supplier approval.
+        """
+    )
+
+    st.markdown("### Product and Trademark Information")
+    st.write(
+        "Product names, OEM names, trademarks, and logos remain the property of their respective owners. "
+        "Their appearance on this website does not imply ownership by Ready Stock Parts."
+    )
+
+    st.markdown("### Customer Responsibility")
+    st.write(
+        "Customers are responsible for confirming part-number accuracy, equipment compatibility, "
+        "required quantities, and technical specifications before placing an order."
+    )
+
+    st.markdown("### Limitation of Liability")
+    st.write(
+        "Ready Stock Parts is not liable for losses resulting from reliance on preliminary website information, "
+        "incorrect customer data, or delays outside its reasonable control."
+    )
+
+    st.markdown("### Contact")
+    st.markdown(f"For questions regarding these terms, contact [{CONTACT_EMAIL}](mailto:{CONTACT_EMAIL}).")
 
 elif page == "RFQ Policy":
     hero()
+    st.subheader("RFQ Policy")
+    st.caption("How quotation requests are processed")
+
+    st.markdown("### Submitting an RFQ")
     st.markdown(
-        f"""
-        <div class="policy-card">
-            <h2>RFQ Policy</h2>
-            <p class="policy-muted">How quotation requests are processed</p>
+        """
+- Customers may submit one or multiple part numbers in a single RFQ.
+- Excel and PDF attachments are accepted for larger requests.
+- Clear part numbers, quantities, OEM information, and equipment details help us respond faster.
+        """
+    )
 
-            <h3>Submitting an RFQ</h3>
-            <ul>
-                <li>Customers may submit one or multiple part numbers in a single RFQ.</li>
-                <li>Excel and PDF attachments are accepted for larger requests.</li>
-                <li>Clear part numbers, quantities, OEM information, and equipment details help us respond faster.</li>
-            </ul>
+    st.markdown("### Response Time")
+    st.write(
+        "We aim to acknowledge RFQs promptly and normally provide an update within 1–2 business days. "
+        "Complex technical or multi-line requests may require additional time."
+    )
 
-            <h3>Response Time</h3>
-            <p>We aim to acknowledge RFQs promptly and normally provide an update within 1–2 business days. Complex technical or multi-line requests may require additional time.</p>
+    st.markdown("### Commercial Status")
+    st.markdown(
+        """
+- An RFQ submission is not a purchase order or contractual commitment.
+- Availability, pricing, lead time, freight, and payment terms are confirmed only in the official quotation.
+- We may request further technical or commercial information before issuing a quotation.
+        """
+    )
 
-            <h3>Commercial Status</h3>
-            <ul>
-                <li>An RFQ submission is not a purchase order or contractual commitment.</li>
-                <li>Availability, pricing, lead time, freight, and payment terms are confirmed only in the official quotation.</li>
-                <li>We may request further technical or commercial information before issuing a quotation.</li>
-            </ul>
+    st.markdown("### Confidentiality")
+    st.write(
+        "RFQ information and attachments are handled for quotation and order-support purposes. "
+        "Sensitive information should be limited to what is necessary for the inquiry."
+    )
 
-            <h3>Confidentiality</h3>
-            <p>RFQ information and attachments are handled for quotation and order-support purposes. Sensitive information should be limited to what is necessary for the inquiry.</p>
-
-            <h3>Support</h3>
-            <p>For urgent requirements, email <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a> or contact us through WhatsApp.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown("### Support")
+    st.markdown(
+        f"For urgent requirements, email [{CONTACT_EMAIL}](mailto:{CONTACT_EMAIL}) "
+        "or contact us through WhatsApp."
     )
 
 elif page == "Admin Dashboard":
