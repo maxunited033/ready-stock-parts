@@ -200,6 +200,17 @@ def inject_css():
             color:#ffffff !important;
             transform: translateY(-1px);
         }
+        div[data-testid="stHorizontalBlock"]:has(button[kind]) {
+            gap: 0.35rem;
+        }
+        button[kind="primary"] {
+            font-weight: 850 !important;
+            border-radius: 999px !important;
+        }
+        button[kind="secondary"] {
+            font-weight: 750 !important;
+            border-radius: 999px !important;
+        }
         @media (max-width: 760px) {
             .block-container {padding-left: 1rem; padding-right: 1rem;}
             .hero {padding: 1.5rem 1.2rem; border-radius: 18px;}
@@ -554,11 +565,19 @@ def get_current_page():
     return PAGES.get(slug, "Home")
 
 
+def navigate_to(slug):
+    st.query_params["page"] = slug
+    st.rerun()
+
+
 def top_navigation():
     current_page = get_current_page()
     current_slug = PAGE_TO_SLUG.get(current_page, "home")
-    links = []
-    main_links = [
+
+    st.markdown('<div class="rsp-navbar-anchor"></div>', unsafe_allow_html=True)
+    cols = st.columns([1.25, 1.15, 1.35, 1.15, 0.9, 0.95, 0.85])
+
+    nav_items = [
         ("home", "Home"),
         ("search", "Search Parts"),
         ("rfq", "Request RFQ"),
@@ -567,17 +586,18 @@ def top_navigation():
         ("contact", "Contact"),
         ("admin", "Admin"),
     ]
-    for slug, label in main_links:
-        active = " active" if slug == current_slug else ""
-        extra = " rsp-cta" if slug == "rfq" else ""
-        links.append('<a class="{}{}" href="?page={}">{}</a>'.format(active, extra, slug, label))
-    nav_html = """
-        <div class="rsp-navbar">
-            <div class="rsp-brand">Ready Stock <span>Parts</span></div>
-            <div class="rsp-links">{links}</div>
-        </div>
-    """.format(links="".join(links))
-    st.markdown(nav_html, unsafe_allow_html=True)
+
+    for col, (slug, label) in zip(cols, nav_items):
+        with col:
+            button_type = "primary" if slug == current_slug or slug == "rfq" else "secondary"
+            if st.button(
+                label,
+                key=f"nav_{slug}",
+                use_container_width=True,
+                type=button_type,
+            ):
+                navigate_to(slug)
+
     return current_page
 
 
@@ -975,18 +995,18 @@ def corporate_footer():
         '</div>'
         '<div>'
         '<div class="footer-title">Quick Links</div>'
-        '<a href="?page=home">Home</a>'
-        '<a href="?page=search">Search Parts</a>'
-        '<a href="?page=rfq">Request RFQ</a>'
-        '<a href="?page=brands">OEM Brands</a>'
-        '<a href="?page=about">About Us</a>'
+        '<a href="?page=home" target="_self">Home</a>'
+        '<a href="?page=search" target="_self">Search Parts</a>'
+        '<a href="?page=rfq" target="_self">Request RFQ</a>'
+        '<a href="?page=brands" target="_self">OEM Brands</a>'
+        '<a href="?page=about" target="_self">About Us</a>'
         '</div>'
         '<div>'
         '<div class="footer-title">Information</div>'
-        '<a href="?page=privacy">Privacy Policy</a>'
-        '<a href="?page=terms">Terms of Use</a>'
-        '<a href="?page=rfq_policy">RFQ Policy</a>'
-        '<a href="?page=contact">Contact Us</a>'
+        '<a href="?page=privacy" target="_self">Privacy Policy</a>'
+        '<a href="?page=terms" target="_self">Terms of Use</a>'
+        '<a href="?page=rfq_policy" target="_self">RFQ Policy</a>'
+        '<a href="?page=contact" target="_self">Contact Us</a>'
         '</div>'
         '<div>'
         '<div class="footer-title">Connect</div>'
