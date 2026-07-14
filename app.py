@@ -88,7 +88,81 @@ def inject_css():
             display: inline-block; padding: 0.55rem 0.85rem; border: 1px solid #dbeafe;
             border-radius: 999px; margin: 0.22rem; background: #eff6ff; color: #1e3a8a; font-weight: 650;
         }
-        .footer-box {border-top: 1px solid #e5e7eb; margin-top: 2rem; padding-top: 1.2rem; color: #64748b;}
+        .footer-box {
+            margin-top: 2.5rem;
+            padding: 2rem;
+            border: 1px solid #dbe3ee;
+            border-radius: 22px;
+            background: #0f172a !important;
+            color: #e2e8f0 !important;
+            box-shadow: 0 14px 40px rgba(15,23,42,0.16);
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1.45fr 1fr 1fr 1.2fr;
+            gap: 1.8rem;
+            align-items: start;
+        }
+        .footer-title {
+            color: #ffffff !important;
+            font-size: 1.05rem;
+            font-weight: 900;
+            margin-bottom: 0.8rem;
+        }
+        .footer-brand {
+            color: #ffffff !important;
+            font-size: 1.35rem;
+            font-weight: 900;
+            margin-bottom: 0.45rem;
+        }
+        .footer-tagline {
+            color: #cbd5e1 !important;
+            line-height: 1.65;
+            margin-bottom: 0.85rem;
+        }
+        .footer-box a {
+            color: #bfdbfe !important;
+            text-decoration: none !important;
+            display: block;
+            margin: 0.42rem 0;
+            font-weight: 650;
+        }
+        .footer-box a:hover {color: #ffffff !important; text-decoration: underline !important;}
+        .footer-contact-line {color: #e2e8f0 !important; margin: 0.48rem 0;}
+        .footer-trust {
+            margin-top: 1.25rem;
+            padding-top: 1.05rem;
+            border-top: 1px solid rgba(255,255,255,0.14);
+            color: #cbd5e1 !important;
+            text-align: center;
+            font-weight: 700;
+        }
+        .footer-bottom {
+            margin-top: 0.85rem;
+            text-align: center;
+            color: #94a3b8 !important;
+            font-size: 0.9rem;
+        }
+        .policy-card {
+            border: 1px solid #dbe3ee;
+            border-radius: 20px;
+            padding: 1.5rem;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            box-shadow: 0 10px 30px rgba(15,23,42,0.07);
+            margin-bottom: 1rem;
+        }
+        .policy-card h2, .policy-card h3, .policy-card p, .policy-card li {
+            color: #0f172a !important;
+        }
+        .policy-card .policy-muted {color: #475569 !important;}
+        @media (max-width: 900px) {
+            .footer-grid {grid-template-columns: 1fr 1fr;}
+        }
+        @media (max-width: 620px) {
+            .footer-grid {grid-template-columns: 1fr;}
+            .footer-box {padding: 1.35rem;}
+        }
         .small-note {font-size:0.88rem; color:#64748b;}
         section[data-testid="stSidebar"] {display: none !important;}
         div[data-testid="collapsedControl"] {display: none !important;}
@@ -458,6 +532,10 @@ PAGES = {
     "rfq": "Request Quotation",
     "brands": "OEM Brands",
     "about": "About",
+    "contact": "Contact Us",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "rfq_policy": "RFQ Policy",
     "admin": "Admin Dashboard",
     "upload": "Upload Inventory",
     "inbox": "RFQ Inbox",
@@ -486,6 +564,7 @@ def top_navigation():
         ("rfq", "Request RFQ"),
         ("brands", "OEM Brands"),
         ("about", "About"),
+        ("contact", "Contact"),
         ("admin", "Admin"),
     ]
     for slug, label in main_links:
@@ -690,6 +769,134 @@ elif page == "About":
     with right:
         contact_box()
 
+
+elif page == "Contact Us":
+    hero()
+    st.subheader("Contact Us")
+    st.caption("Connect with Ready Stock Parts for urgent RFQs, availability checks, and industrial spare parts identification.")
+    left, right = st.columns([1.25, 1])
+    with left:
+        st.markdown(
+            f"""
+            <div class="policy-card">
+                <h2>Ready Stock Parts</h2>
+                <p class="policy-muted"><b>OEM & Aftermarket Industrial Spare Parts Supplier</b></p>
+                <p>📍 Dammam, Eastern Province, Saudi Arabia</p>
+                <p>✉️ <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a></p>
+                <p>📞 <a href="tel:{CONTACT_MOBILE}">{CONTACT_MOBILE}</a></p>
+                <p>🌍 Serving industrial customers across Saudi Arabia and GCC countries.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right:
+        contact_box()
+
+elif page == "Privacy Policy":
+    hero()
+    st.markdown(
+        f"""
+        <div class="policy-card">
+            <h2>Privacy Policy</h2>
+            <p class="policy-muted">Last updated: July 2026</p>
+            <p>Ready Stock Parts respects the privacy of customers and website visitors. This policy explains how information submitted through the website is handled.</p>
+
+            <h3>Information We Collect</h3>
+            <ul>
+                <li>Company name, contact name, email address, and telephone or WhatsApp number.</li>
+                <li>Part numbers, quantities, equipment details, and quotation requirements.</li>
+                <li>Files voluntarily uploaded with an RFQ, including Excel and PDF documents.</li>
+            </ul>
+
+            <h3>How We Use Information</h3>
+            <ul>
+                <li>To review availability and prepare commercial quotations.</li>
+                <li>To contact customers regarding their RFQs or technical inquiries.</li>
+                <li>To improve website functionality, customer service, and inventory planning.</li>
+            </ul>
+
+            <h3>Information Sharing</h3>
+            <p>Customer information is not sold. Information may be shared only with relevant suppliers, logistics providers, or service partners when necessary to process a quotation or order.</p>
+
+            <h3>Data Security</h3>
+            <p>Reasonable technical and organizational measures are used to protect submitted information. However, no internet transmission method can be guaranteed to be completely secure.</p>
+
+            <h3>Contact</h3>
+            <p>Questions regarding this policy may be sent to <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+elif page == "Terms of Use":
+    hero()
+    st.markdown(
+        f"""
+        <div class="policy-card">
+            <h2>Terms of Use</h2>
+            <p class="policy-muted">Last updated: July 2026</p>
+
+            <h3>Website Purpose</h3>
+            <p>This website is a B2B industrial spare parts inquiry and RFQ platform. Information shown on the website is provided for general commercial reference only.</p>
+
+            <h3>Quotations and Availability</h3>
+            <ul>
+                <li>Website availability indicators are not a binding stock commitment.</li>
+                <li>Prices, delivery dates, warranty terms, and commercial conditions are valid only when included in an official written quotation.</li>
+                <li>All quotations remain subject to final stock confirmation and supplier approval.</li>
+            </ul>
+
+            <h3>Product and Trademark Information</h3>
+            <p>Product names, OEM names, trademarks, and logos remain the property of their respective owners. Their appearance on this website does not imply ownership by Ready Stock Parts.</p>
+
+            <h3>Customer Responsibility</h3>
+            <p>Customers are responsible for confirming part-number accuracy, equipment compatibility, required quantities, and technical specifications before placing an order.</p>
+
+            <h3>Limitation of Liability</h3>
+            <p>Ready Stock Parts is not liable for losses resulting from reliance on preliminary website information, incorrect customer data, or delays outside its reasonable control.</p>
+
+            <h3>Contact</h3>
+            <p>For questions regarding these terms, contact <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+elif page == "RFQ Policy":
+    hero()
+    st.markdown(
+        f"""
+        <div class="policy-card">
+            <h2>RFQ Policy</h2>
+            <p class="policy-muted">How quotation requests are processed</p>
+
+            <h3>Submitting an RFQ</h3>
+            <ul>
+                <li>Customers may submit one or multiple part numbers in a single RFQ.</li>
+                <li>Excel and PDF attachments are accepted for larger requests.</li>
+                <li>Clear part numbers, quantities, OEM information, and equipment details help us respond faster.</li>
+            </ul>
+
+            <h3>Response Time</h3>
+            <p>We aim to acknowledge RFQs promptly and normally provide an update within 1–2 business days. Complex technical or multi-line requests may require additional time.</p>
+
+            <h3>Commercial Status</h3>
+            <ul>
+                <li>An RFQ submission is not a purchase order or contractual commitment.</li>
+                <li>Availability, pricing, lead time, freight, and payment terms are confirmed only in the official quotation.</li>
+                <li>We may request further technical or commercial information before issuing a quotation.</li>
+            </ul>
+
+            <h3>Confidentiality</h3>
+            <p>RFQ information and attachments are handled for quotation and order-support purposes. Sensitive information should be limited to what is necessary for the inquiry.</p>
+
+            <h3>Support</h3>
+            <p>For urgent requirements, email <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a> or contact us through WhatsApp.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 elif page == "Admin Dashboard":
     require_admin()
     hero()
@@ -728,12 +935,53 @@ elif page == "RFQ Inbox":
     st.dataframe(rfqs, use_container_width=True, hide_index=True)
     st.download_button("Download RFQs", to_excel_bytes(rfqs), "customer_rfqs.xlsx")
 
-st.markdown(
-    """
-    <div class="footer-box">
-        Ready Stock Parts | Industrial OEM spare parts inquiry portal for Saudi Arabia, GCC & Middle East.<br>
-        Public pages do not display internal cost, total inventory value, or customer RFQ records.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+def corporate_footer():
+    whatsapp_text = quote_plus("Hello Mossab, I would like to inquire about industrial spare parts availability.")
+    whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={whatsapp_text}"
+    st.markdown(
+        f"""
+        <div class="footer-box">
+            <div class="footer-grid">
+                <div>
+                    <div class="footer-brand">Ready Stock Parts</div>
+                    <div class="footer-tagline">OEM &amp; Aftermarket Industrial Spare Parts Supplier supporting procurement, maintenance, and engineering teams across Saudi Arabia and the GCC.</div>
+                    <div class="footer-contact-line">📍 Dammam, Saudi Arabia</div>
+                    <div class="footer-contact-line">✉️ {CONTACT_EMAIL}</div>
+                    <div class="footer-contact-line">📞 {CONTACT_MOBILE}</div>
+                </div>
+
+                <div>
+                    <div class="footer-title">Quick Links</div>
+                    <a href="?page=home">Home</a>
+                    <a href="?page=search">Search Parts</a>
+                    <a href="?page=rfq">Request RFQ</a>
+                    <a href="?page=brands">OEM Brands</a>
+                    <a href="?page=about">About Us</a>
+                </div>
+
+                <div>
+                    <div class="footer-title">Information</div>
+                    <a href="?page=privacy">Privacy Policy</a>
+                    <a href="?page=terms">Terms of Use</a>
+                    <a href="?page=rfq_policy">RFQ Policy</a>
+                    <a href="?page=contact">Contact Us</a>
+                </div>
+
+                <div>
+                    <div class="footer-title">Connect</div>
+                    <a href="mailto:{CONTACT_EMAIL}">Email Sales</a>
+                    <a href="{whatsapp_url}" target="_blank">WhatsApp Inquiry</a>
+                    <a href="https://www.linkedin.com/" target="_blank">LinkedIn</a>
+                    <div class="footer-contact-line" style="margin-top:0.9rem;">Business inquiries and quotation requests are welcome.</div>
+                </div>
+            </div>
+
+            <div class="footer-trust">Serving Industrial Customers Across Saudi Arabia &amp; GCC</div>
+            <div class="footer-bottom">© 2026 Ready Stock Parts. All Rights Reserved.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+corporate_footer()
