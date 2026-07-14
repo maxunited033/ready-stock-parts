@@ -936,52 +936,58 @@ elif page == "RFQ Inbox":
     st.download_button("Download RFQs", to_excel_bytes(rfqs), "customer_rfqs.xlsx")
 
 def corporate_footer():
-    whatsapp_text = quote_plus("Hello Mossab, I would like to inquire about industrial spare parts availability.")
-    whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={whatsapp_text}"
-    st.markdown(
-        f"""
-        <div class="footer-box">
-            <div class="footer-grid">
-                <div>
-                    <div class="footer-brand">Ready Stock Parts</div>
-                    <div class="footer-tagline">OEM &amp; Aftermarket Industrial Spare Parts Supplier supporting procurement, maintenance, and engineering teams across Saudi Arabia and the GCC.</div>
-                    <div class="footer-contact-line">📍 Dammam, Saudi Arabia</div>
-                    <div class="footer-contact-line">✉️ {CONTACT_EMAIL}</div>
-                    <div class="footer-contact-line">📞 {CONTACT_MOBILE}</div>
-                </div>
-
-                <div>
-                    <div class="footer-title">Quick Links</div>
-                    <a href="?page=home">Home</a>
-                    <a href="?page=search">Search Parts</a>
-                    <a href="?page=rfq">Request RFQ</a>
-                    <a href="?page=brands">OEM Brands</a>
-                    <a href="?page=about">About Us</a>
-                </div>
-
-                <div>
-                    <div class="footer-title">Information</div>
-                    <a href="?page=privacy">Privacy Policy</a>
-                    <a href="?page=terms">Terms of Use</a>
-                    <a href="?page=rfq_policy">RFQ Policy</a>
-                    <a href="?page=contact">Contact Us</a>
-                </div>
-
-                <div>
-                    <div class="footer-title">Connect</div>
-                    <a href="mailto:{CONTACT_EMAIL}">Email Sales</a>
-                    <a href="{whatsapp_url}" target="_blank">WhatsApp Inquiry</a>
-                    <a href="https://www.linkedin.com/" target="_blank">LinkedIn</a>
-                    <div class="footer-contact-line" style="margin-top:0.9rem;">Business inquiries and quotation requests are welcome.</div>
-                </div>
-            </div>
-
-            <div class="footer-trust">Serving Industrial Customers Across Saudi Arabia &amp; GCC</div>
-            <div class="footer-bottom">© 2026 Ready Stock Parts. All Rights Reserved.</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    whatsapp_text = quote_plus(
+        "Hello Mossab, I would like to inquire about industrial spare parts availability."
     )
+    whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={whatsapp_text}"
+
+    footer_html = f"""
+<div class="footer-box">
+  <div class="footer-grid">
+    <div>
+      <div class="footer-brand">Ready Stock Parts</div>
+      <div class="footer-tagline">
+        OEM &amp; Aftermarket Industrial Spare Parts Supplier supporting procurement,
+        maintenance, and engineering teams across Saudi Arabia and the GCC.
+      </div>
+      <div class="footer-contact-line">📍 Dammam, Saudi Arabia</div>
+      <div class="footer-contact-line">✉️ {CONTACT_EMAIL}</div>
+      <div class="footer-contact-line">📞 {CONTACT_MOBILE}</div>
+    </div>
+
+    <div>
+      <div class="footer-title">Quick Links</div>
+      <a href="?page=home">Home</a>
+      <a href="?page=search">Search Parts</a>
+      <a href="?page=rfq">Request RFQ</a>
+      <a href="?page=brands">OEM Brands</a>
+      <a href="?page=about">About Us</a>
+    </div>
+
+    <div>
+      <div class="footer-title">Information</div>
+      <a href="?page=privacy">Privacy Policy</a>
+      <a href="?page=terms">Terms of Use</a>
+      <a href="?page=rfq_policy">RFQ Policy</a>
+      <a href="?page=contact">Contact Us</a>
+    </div>
+
+    <div>
+      <div class="footer-title">Connect</div>
+      <a href="mailto:{CONTACT_EMAIL}">Email Sales</a>
+      <a href="{whatsapp_url}" target="_blank">WhatsApp Inquiry</a>
+      <a href="https://www.linkedin.com/" target="_blank">LinkedIn</a>
+      <div class="footer-contact-line" style="margin-top:0.9rem;">
+        Business inquiries and quotation requests are welcome.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-trust">Serving Industrial Customers Across Saudi Arabia &amp; GCC</div>
+  <div class="footer-bottom">© 2026 Ready Stock Parts. All Rights Reserved.</div>
+</div>
+"""
+    st.markdown(footer_html, unsafe_allow_html=True)
 
 
 corporate_footer()
