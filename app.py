@@ -1,8 +1,8 @@
 import os
+from pathlib import Path
 from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote_plus
-from xml.sax.saxutils import escape as xml_escape
 import json
 import base64
 import urllib.request
@@ -25,7 +25,6 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Manutd@033")
 CONTACT_EMAIL = "sales@readystockparts.com"
 CONTACT_MOBILE = "+966561261005"
 WHATSAPP_NUMBER = "966561261005"
-SITE_URL = "https://www.readystockparts.com"
 
 # Email notification settings via Resend API. Set these in Render > Environment.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
@@ -481,193 +480,6 @@ Website: https://readystockparts.com
     except Exception as exc:
         return False, str(exc), ""
 
-def safe_query_value(name, default=""):
-    try:
-        value = st.query_params.get(name, default)
-    except Exception:
-        return default
-    if isinstance(value, list):
-        return str(value[0]) if value else default
-    return str(value)
-
-
-def part_page_url(part_number):
-    return f"{SITE_URL}/?page=part&part={quote_plus(str(part_number).strip())}"
-
-
-def write_seo_static_files(df):
-    """Generate a sitemap from current in-stock inventory."""
-    static_dir = Path("static")
-    static_dir.mkdir(parents=True, exist_ok=True)
-
-    urls = [
-        f"{SITE_URL}/",
-        f"{SITE_URL}/?page=search",
-        f"{SITE_URL}/?page=rfq",
-        f"{SITE_URL}/?page=brands",
-        f"{SITE_URL}/?page=about",
-        f"{SITE_URL}/?page=contact",
-        f"{SITE_URL}/?page=privacy",
-        f"{SITE_URL}/?page=terms",
-        f"{SITE_URL}/?page=rfq_policy",
-    ]
-
-    unique_parts = (
-        df["Part Number"]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .loc[lambda s: s.ne("")]
-        .drop_duplicates()
-        .tolist()
-    )
-    urls.extend(part_page_url(part) for part in unique_parts)
-
-    sitemap_lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ]
-    for url in urls:
-        sitemap_lines.append("  <url>")
-        sitemap_lines.append(f"    <loc>{xml_escape(url)}</loc>")
-        sitemap_lines.append("  </url>")
-    sitemap_lines.append("</urlset>")
-    (static_dir / "sitemap.xml").write_text("\n".join(sitemap_lines), encoding="utf-8")
-
-    robots = (
-        "User-agent: *\n"
-        "Allow: /\n"
-        f"Sitemap: {SITE_URL}/app/static/sitemap.xml\n"
-    )
-    (static_dir / "robots.txt").write_text(robots, encoding="utf-8")
-
-
-def inject_part_seo(part_number, manufacturer, description):
-    """Update browser title and description for a part detail view."""
-    safe_part = str(part_number).replace('"', "").replace("<", "").replace(">", "")
-    safe_manufacturer = str(manufacturer).replace('"', "").replace("<", "").replace(">", "")
-    safe_description = str(description).replace('"', "").replace("<", "").replace(">", "")
-    title = f"{safe_part} | {safe_manufacturer} Spare Parts | Ready Stock Parts"
-    meta_description = (
-        f"Request a quotation for part number {safe_part}. "
-        f"{safe_manufacturer} industrial spare parts availability for Saudi Arabia and GCC."
-    )
-    canonical = part_page_url(safe_part)
-
-    st.html(
-        f"""
-        <script>
-        document.title = {json.dumps(title)};
-        let meta = document.querySelector('meta[name="description"]');
-        if (!meta) {{
-            meta = document.createElement('meta');
-            meta.setAttribute('name', 'description');
-            document.head.appendChild(meta);
-        }}
-        meta.setAttribute('content', {json.dumps(meta_description)});
-
-        let canonical = document.querySelector('link[rel="canonical"]');
-        if (!canonical) {{
-            canonical = document.createElement('link');
-            canonical.setAttribute('rel', 'canonical');
-            document.head.appendChild(canonical);
-        }}
-        canonical.setAttribute('href', {json.dumps(canonical)});
-        </script>
-        """
-    )
-
-
-def render_part_detail(inventory_df):
-    requested_part = safe_query_value("part", "").strip()
-    if not requested_part:
-        st.warning("No part number was selected.")
-        if st.button("Go to Search Parts", type="primary"):
-            st.query_params["page"] = "search"
-            st.rerun()
-        return
-
-    match = inventory_df[
-        inventory_df["Part Number"].astype(str).str.strip().str.casefold()
-        == requested_part.casefold()
-    ]
-
-    if match.empty:
-        st.error("This part number was not found in the current public inventory.")
-        st.markdown(f"**Requested Part Number:** `{requested_part}`")
-        if st.button("Submit a Manual RFQ", type="primary"):
-            st.query_params["page"] = "rfq"
-            st.query_params["part"] = requested_part
-            st.rerun()
-        return
-
-    row = match.iloc[0]
-    part_number = str(row.get("Part Number", requested_part))
-    manufacturer = str(row.get("Manufacturer", "TBA"))
-    description = str(row.get("Description", "TBA"))
-    category = str(row.get("Category", "TBA"))
-    availability = str(row.get("Availability", "Available on Request"))
-
-    inject_part_seo(part_number, manufacturer, description)
-
-    st.markdown(f"# {part_number}")
-    st.caption("Industrial spare part availability and quotation request")
-
-    c1, c2 = st.columns([1.55, 1])
-    with c1:
-        st.markdown("### Part Information")
-        st.markdown(f"**Part Number:** `{part_number}`")
-        st.markdown(f"**Manufacturer / OEM:** {manufacturer}")
-        st.markdown(f"**Description:** {description}")
-        st.markdown(f"**Category:** {category}")
-        st.markdown(f"**Availability:** {availability}")
-        st.info(
-            "Pricing, delivery, and final stock confirmation are provided through an official quotation."
-        )
-
-    with c2:
-        st.markdown("### Request Pricing")
-        if st.button("Request RFQ for This Part", type="primary", use_container_width=True):
-            st.query_params["page"] = "rfq"
-            st.query_params["part"] = part_number
-            st.rerun()
-
-        whatsapp_text = quote_plus(
-            f"Hello Mossab, I would like to request availability and pricing for part number {part_number}."
-        )
-        whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={whatsapp_text}"
-        st.link_button(
-            "WhatsApp Inquiry",
-            whatsapp_url,
-            use_container_width=True,
-        )
-
-        st.markdown(f"[Email Sales](mailto:{CONTACT_EMAIL}?subject=RFQ%20for%20{quote_plus(part_number)})")
-
-    st.markdown("---")
-    st.markdown("### Related Available Parts")
-    related = inventory_df[
-        (inventory_df["Manufacturer"].astype(str) == manufacturer)
-        & (inventory_df["Part Number"].astype(str) != part_number)
-    ].head(8).copy()
-
-    if related.empty:
-        st.caption("No related parts are currently displayed.")
-    else:
-        related["View"] = related["Part Number"].apply(part_page_url)
-        st.dataframe(
-            related[["Part Number", "Description", "Manufacturer", "Availability", "View"]],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "View": st.column_config.LinkColumn(
-                    "Part Page",
-                    display_text="Open",
-                )
-            },
-        )
-
-
 def search_df(df, query, manufacturer, availability):
     f = df.copy()
     if query:
@@ -733,7 +545,6 @@ PAGES = {
     "brands": "OEM Brands",
     "about": "About",
     "contact": "Contact Us",
-    "part": "Part Details",
     "privacy": "Privacy Policy",
     "terms": "Terms of Use",
     "rfq_policy": "RFQ Policy",
@@ -799,7 +610,6 @@ if not os.path.exists(DEFAULT_INVENTORY):
 
 inventory = load_inventory(DEFAULT_INVENTORY)
 public_inventory = inventory[inventory["Qty"] > 0].copy()
-write_seo_static_files(public_inventory)
 
 page = top_navigation()
 
@@ -843,25 +653,8 @@ elif page == "Search Parts":
 
     result = search_df(public_inventory, query, manufacturer, availability)
     st.metric("Matching Available Items", f"{len(result):,}")
-
-    public_result = result[SAFE_COLUMNS].copy()
-    public_result["View Part"] = public_result["Part Number"].apply(part_page_url)
-    st.dataframe(
-        public_result,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "View Part": st.column_config.LinkColumn(
-                "Part Page",
-                display_text="Open",
-            )
-        },
-    )
-    st.download_button(
-        "Download Customer Stock List",
-        to_excel_bytes(result[SAFE_COLUMNS]),
-        "ready_stock_parts_customer_list.xlsx",
-    )
+    st.dataframe(result[SAFE_COLUMNS], use_container_width=True, hide_index=True)
+    st.download_button("Download Customer Stock List", to_excel_bytes(result[SAFE_COLUMNS]), "ready_stock_parts_customer_list.xlsx")
 
     st.markdown("---")
     st.markdown("**Need pricing or delivery details?** Go to the Request Quotation page and submit the required part number and quantity.")
@@ -891,12 +684,7 @@ elif page == "Request Quotation":
         for i in range(st.session_state.rfq_item_count):
             cols = st.columns([2.2, 0.8, 1.4, 2.2])
             with cols[0]:
-                default_part = safe_query_value("part", "") if i == 0 else ""
-                part_no = st.text_input(
-                    f"Part Number {i + 1}" + (" *" if i == 0 else ""),
-                    value=default_part,
-                    key=f"rfq_part_{i}",
-                )
+                part_no = st.text_input(f"Part Number {i + 1}" + (" *" if i == 0 else ""), key=f"rfq_part_{i}")
             with cols[1]:
                 qty = st.number_input(f"Qty {i + 1}", min_value=1, value=1, key=f"rfq_qty_{i}")
             with cols[2]:
@@ -1148,10 +936,6 @@ elif page == "RFQ Policy":
         f"For urgent requirements, email [{CONTACT_EMAIL}](mailto:{CONTACT_EMAIL}) "
         "or contact us through WhatsApp."
     )
-
-elif page == "Part Details":
-    hero()
-    render_part_detail(public_inventory)
 
 elif page == "Admin Dashboard":
     require_admin()
