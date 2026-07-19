@@ -4,6 +4,7 @@ from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote_plus
 from xml.sax.saxutils import escape as xml_escape
+from html import escape as html_escape
 import json
 import base64
 import urllib.request
@@ -12,8 +13,49 @@ import urllib.error
 import pandas as pd
 import streamlit as st
 
+def patch_streamlit_frontend_metadata():
+    try:
+        import streamlit as _streamlit
+        static_index = Path(_streamlit.__file__).resolve().parent / "static" / "index.html"
+        if not static_index.exists():
+            return
+        html = static_index.read_text(encoding="utf-8")
+        updated = re.sub(
+            r"<title>.*?</title>",
+            "<title>Ready Stock Parts | Industrial OEM Spare Parts Supplier</title>",
+            html, count=1, flags=re.IGNORECASE | re.DOTALL,
+        )
+        description = (
+            "Ready Stock Parts is a B2B industrial spare parts platform serving "
+            "Saudi Arabia and GCC customers with OEM and aftermarket parts availability "
+            "checks and RFQ submissions."
+        )
+        if re.search(r'<meta[^>]+name=["\']description["\']', updated, flags=re.IGNORECASE):
+            updated = re.sub(
+                r'<meta[^>]+name=["\']description["\'][^>]*>',
+                f'<meta name="description" content="{description}">',
+                updated, count=1, flags=re.IGNORECASE,
+            )
+        else:
+            updated = updated.replace(
+                "</head>",
+                f'<meta name="description" content="{description}">'
+                '<meta property="og:site_name" content="Ready Stock Parts">'
+                '<meta property="og:title" content="Ready Stock Parts | Industrial OEM Spare Parts Supplier">'
+                '<meta property="og:description" content="B2B industrial spare parts availability and RFQ platform for Saudi Arabia and GCC customers.">'
+                '<meta property="og:type" content="website">'
+                '<meta property="og:url" content="https://www.readystockparts.com/">'
+                "</head>", 1,
+            )
+        if updated != html:
+            static_index.write_text(updated, encoding="utf-8")
+    except Exception:
+        pass
+
+patch_streamlit_frontend_metadata()
+
 st.set_page_config(
-    page_title="Ready Stock Parts | Industrial OEM Spare Parts",
+    page_title="Ready Stock Parts | Industrial OEM Spare Parts Supplier",
     page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -482,6 +524,46 @@ Website: https://readystockparts.com
     except Exception as exc:
         return False, str(exc), ""
 
+def set_dynamic_page_metadata(title, description, canonical_url=None):
+    title = str(title).strip() or "Ready Stock Parts"
+    description = str(description).strip()
+    canonical_url = canonical_url or SITE_URL
+    payload = json.dumps({"title": title, "description": description, "canonical": canonical_url}).replace("</", "<\/")
+    st.markdown(
+        f"""
+        <script>
+        (() => {{
+            const data = {payload};
+            const doc = window.parent.document;
+            doc.title = data.title;
+            let meta = doc.querySelector('meta[name="description"]');
+            if (!meta) {{ meta = doc.createElement('meta'); meta.setAttribute('name','description'); doc.head.appendChild(meta); }}
+            meta.setAttribute('content', data.description);
+            let canonical = doc.querySelector('link[rel="canonical"]');
+            if (!canonical) {{ canonical = doc.createElement('link'); canonical.setAttribute('rel','canonical'); doc.head.appendChild(canonical); }}
+            canonical.setAttribute('href', data.canonical);
+        }})();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def apply_page_metadata(page_name):
+    metadata = {
+        "Home": ("Ready Stock Parts | Industrial OEM Spare Parts Supplier", "Search ready-stock OEM and aftermarket industrial spare parts and submit RFQs across Saudi Arabia and GCC.", f"{SITE_URL}/"),
+        "Search Parts": ("Search Industrial Spare Parts | Ready Stock Parts", "Search industrial spare parts by part number, description, manufacturer, OEM, or category.", f"{SITE_URL}/?page=search"),
+        "Request Quotation": ("Request a Spare Parts Quotation | Ready Stock Parts", "Submit single-line or multi-line RFQs for industrial OEM and aftermarket spare parts.", f"{SITE_URL}/?page=rfq"),
+        "OEM Brands": ("OEM Brands and Manufacturers | Ready Stock Parts", "Browse industrial OEM and manufacturer coverage available through Ready Stock Parts.", f"{SITE_URL}/?page=brands"),
+        "About": ("About Ready Stock Parts | Saudi Arabia & GCC", "Learn about Ready Stock Parts and our industrial spare parts support for Saudi Arabia and GCC customers.", f"{SITE_URL}/?page=about"),
+        "Contact Us": ("Contact Ready Stock Parts | Sales and RFQ Support", "Contact Ready Stock Parts for urgent RFQs, spare parts identification, and availability checks.", f"{SITE_URL}/?page=contact"),
+        "Privacy Policy": ("Privacy Policy | Ready Stock Parts", "Read the Ready Stock Parts privacy policy for website visitors and RFQ customers.", f"{SITE_URL}/?page=privacy"),
+        "Terms of Use": ("Terms of Use | Ready Stock Parts", "Read the commercial website terms and conditions for Ready Stock Parts.", f"{SITE_URL}/?page=terms"),
+        "RFQ Policy": ("RFQ Policy | Ready Stock Parts", "Learn how Ready Stock Parts processes industrial spare parts quotation requests.", f"{SITE_URL}/?page=rfq_policy"),
+    }
+    title, description, canonical = metadata.get(page_name, ("Ready Stock Parts | Industrial OEM Spare Parts Supplier", "B2B industrial spare parts availability and RFQ platform serving Saudi Arabia and GCC customers.", SITE_URL))
+    set_dynamic_page_metadata(title, description, canonical)
+
+
 def query_value(name, default=""):
     try:
         value = st.query_params.get(name, default)
@@ -568,6 +650,12 @@ def render_part_detail(inventory_df):
     description = str(row.get("Description", "TBA"))
     category = str(row.get("Category", "TBA"))
     availability = str(row.get("Availability", "Available on Request"))
+
+    set_dynamic_page_metadata(
+        f"{part_number} | {manufacturer} Spare Parts | Ready Stock Parts",
+        f"Request availability and pricing for part number {part_number}. {manufacturer} industrial spare parts support for Saudi Arabia and GCC customers.",
+        part_page_url(part_number),
+    )
 
     st.markdown(f"# {part_number}")
     st.caption("Industrial spare part availability and quotation request")
@@ -738,6 +826,9 @@ public_inventory = inventory[inventory["Qty"] > 0].copy()
 write_seo_static_files(public_inventory)
 
 page = top_navigation()
+
+if page != "Part Details":
+    apply_page_metadata(page)
 
 if page == "Home":
     hero()
