@@ -14,62 +14,98 @@ DESCRIPTION = (
 SITE_URL = "https://www.readystockparts.com/"
 
 
-def patch_streamlit_index() -> None:
-    """
-    Patch Streamlit's static HTML shell BEFORE the Streamlit server starts.
-    This ensures View Source and search-engine crawlers see Ready Stock Parts
-    instead of the default <title>Streamlit</title>.
-    """
-    static_index = Path(streamlit.__file__).resolve().parent / "static" / "index.html"
+def patch_streamlit_frontend() -> None:
+    package_root = Path(streamlit.__file__).resolve().parent
+    candidates = []
 
-    if not static_index.exists():
-        raise FileNotFoundError(f"Streamlit index.html not found: {static_index}")
+    # Known Streamlit locations across versions.
+    known = [
+        package_root / "static" / "index.html",
+        package_root / "web" / "server" / "static" / "index.html",
+    ]
+    for path in known:
+        if path.exists():
+            candidates.append(path)
 
-    html = static_index.read_text(encoding="utf-8")
+    # Fallback: search the installed package for any Streamlit HTML shell.
+    for path in package_root.rglob("index.html"):
+        if path not in candidates:
+            try:
+                sample = path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            if "<title>Streamlit</title>" in sample or "window.prerenderReady" in sample:
+                candidates.append(path)
 
-    html = re.sub(
-        r"<title>.*?</title>",
-        f"<title>{TITLE}</title>",
-        html,
-        count=1,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
+    if not candidates:
+        raise FileNotFoundError(
+            f"No Streamlit frontend index.html found under {package_root}"
+        )
 
-    # Remove existing description/OG tags if present to avoid duplicates.
-    html = re.sub(
-        r'<meta[^>]+name=["\']description["\'][^>]*>\s*',
-        "",
-        html,
-        flags=re.IGNORECASE,
-    )
-    html = re.sub(
-        r'<meta[^>]+property=["\']og:(?:site_name|title|description|type|url)["\'][^>]*>\s*',
-        "",
-        html,
-        flags=re.IGNORECASE,
-    )
+    patched = []
+    for index_file in candidates:
+        html = index_file.read_text(encoding="utf-8", errors="ignore")
 
-    seo_tags = (
-        f'<meta name="description" content="{DESCRIPTION}" />\n'
-        f'<link rel="canonical" href="{SITE_URL}" />\n'
-        f'<meta property="og:site_name" content="Ready Stock Parts" />\n'
-        f'<meta property="og:title" content="{TITLE}" />\n'
-        f'<meta property="og:description" content="{DESCRIPTION}" />\n'
-        f'<meta property="og:type" content="website" />\n'
-        f'<meta property="og:url" content="{SITE_URL}" />\n'
-        f'<meta name="twitter:card" content="summary" />\n'
-        f'<meta name="twitter:title" content="{TITLE}" />\n'
-        f'<meta name="twitter:description" content="{DESCRIPTION}" />\n'
-    )
+        updated = re.sub(
+            r"<title>.*?</title>",
+            f"<title>{TITLE}</title>",
+            html,
+            count=1,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
 
-    html = html.replace("</head>", f"{seo_tags}</head>", 1)
-    static_index.write_text(html, encoding="utf-8")
+        # Remove existing tags to avoid duplicates.
+        updated = re.sub(
+            r'<meta[^>]+name=["\']description["\'][^>]*>\s*',
+            "",
+            updated,
+            flags=re.IGNORECASE,
+        )
+        updated = re.sub(
+            r'<link[^>]+rel=["\']canonical["\'][^>]*>\s*',
+            "",
+            updated,
+            flags=re.IGNORECASE,
+        )
+        updated = re.sub(
+            r'<meta[^>]+property=["\']og:(?:site_name|title|description|type|url)["\'][^>]*>\s*',
+            "",
+            updated,
+            flags=re.IGNORECASE,
+        )
 
-    print(f"Patched Streamlit metadata in: {static_index}")
-    print(f"Title: {TITLE}")
+        seo_tags = (
+            f'<meta name="description" content="{DESCRIPTION}" />\n'
+            f'<link rel="canonical" href="{SITE_URL}" />\n'
+            f'<meta property="og:site_name" content="Ready Stock Parts" />\n'
+            f'<meta property="og:title" content="{TITLE}" />\n'
+            f'<meta property="og:description" content="{DESCRIPTION}" />\n'
+            f'<meta property="og:type" content="website" />\n'
+            f'<meta property="og:url" content="{SITE_URL}" />\n'
+            f'<meta name="twitter:card" content="summary" />\n'
+            f'<meta name="twitter:title" content="{TITLE}" />\n'
+            f'<meta name="twitter:description" content="{DESCRIPTION}" />\n'
+        )
+
+        updated = updated.replace("</head>", f"{seo_tags}</head>", 1)
+        index_file.write_text(updated, encoding="utf-8")
+
+        verification = index_file.read_text(encoding="utf-8", errors="ignore")
+        if f"<title>{TITLE}</title>" not in verification:
+            raise RuntimeError(f"Title patch verification failed for {index_file}")
+
+        patched.append(str(index_file))
+
+    print("Patched Streamlit frontend files:", flush=True)
+    for item in patched:
+        print(f" - {item}", flush=True)
+    print(f"Verified title: {TITLE}", flush=True)
 
 
 def start_streamlit() -> None:
+    # Create the folder before Streamlit starts so static serving does not warn.
+    Path("static").mkdir(parents=True, exist_ok=True)
+
     app_file = os.environ.get("STREAMLIT_APP_FILE", "app.py")
     port = os.environ.get("PORT", "10000")
 
@@ -84,9 +120,10 @@ def start_streamlit() -> None:
         "--server.headless=true",
     ]
 
+    print("Starting Streamlit with:", " ".join(command), flush=True)
     os.execv(sys.executable, command)
 
 
 if __name__ == "__main__":
-    patch_streamlit_index()
+    patch_streamlit_frontend()
     start_streamlit()
