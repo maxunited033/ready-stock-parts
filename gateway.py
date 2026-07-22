@@ -261,6 +261,9 @@ async def startup_event():
         f"--server.port={STREAMLIT_PORT}",
         "--server.headless=true",
         f"--server.baseUrlPath={STREAMLIT_BASE.strip('/')}",
+        "--server.enableCORS=false",
+        "--server.enableXsrfProtection=false",
+        "--server.fileWatcherType=none",
         "--browser.gatherUsageStats=false",
     ]
     streamlit_process = subprocess.Popen(command)
@@ -312,32 +315,80 @@ async def health():
 
 @app.websocket("/app/{path:path}")
 async def websocket_proxy(websocket: WebSocket, path: str):
-    await websocket.accept()
+    """
+    Proxy Streamlit's websocket connection. The loading skeleton remains on
+    screen whenever this connection fails, so this route must preserve binary
+    and text frames in both directions.
+    """
+    requested_subprotocols = websocket.scope.get("subprotocols", [])
+    selected_subprotocol = requested_subprotocols[0] if requested_subprotocols else None
+    await websocket.accept(subprotocol=selected_subprotocol)
+
     target = f"ws://{STREAMLIT_HOST}:{STREAMLIT_PORT}{STREAMLIT_BASE}/{path}"
     if websocket.url.query:
         target += f"?{websocket.url.query}"
+
+    connect_kwargs = {
+        "open_timeout": 20,
+        "ping_interval": 20,
+        "ping_timeout": 20,
+        "max_size": None,
+    }
+    if requested_subprotocols:
+        connect_kwargs["subprotocols"] = requested_subprotocols
+
     try:
-        async with websockets.connect(target) as upstream:
+        async with websockets.connect(target, **connect_kwargs) as upstream:
             async def client_to_upstream():
                 while True:
                     message = await websocket.receive()
-                    if message["type"] == "websocket.disconnect":
-                        break
+                    message_type = message.get("type")
+
+                    if message_type == "websocket.disconnect":
+                        await upstream.close()
+                        return
+
                     if message.get("bytes") is not None:
                         await upstream.send(message["bytes"])
                     elif message.get("text") is not None:
                         await upstream.send(message["text"])
 
             async def upstream_to_client():
-                async for message in upstream:
-                    if isinstance(message, bytes):
-                        await websocket.send_bytes(message)
-                    else:
-                        await websocket.send_text(message)
+                try:
+                    async for message in upstream:
+                        if isinstance(message, bytes):
+                            await websocket.send_bytes(message)
+                        else:
+                            await websocket.send_text(message)
+                finally:
+                    try:
+                        await websocket.close()
+                    except Exception:
+                        pass
 
-            await asyncio.gather(client_to_upstream(), upstream_to_client())
+            tasks = [
+                asyncio.create_task(client_to_upstream()),
+                asyncio.create_task(upstream_to_client()),
+            ]
+            done, pending = await asyncio.wait(
+                tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            for task in done:
+                exc = task.exception()
+                if exc:
+                    raise exc
+
     except (WebSocketDisconnect, websockets.ConnectionClosed):
         pass
+    except Exception as exc:
+        print(f"WebSocket proxy error for {path}: {exc}", flush=True)
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
 
 
 @app.api_route("/app/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
